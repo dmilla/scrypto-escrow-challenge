@@ -125,6 +125,21 @@ mod escrow {
             
             self.offered_resource.take_all()
         }
+
+        pub fn get_offered_resource_info(&self) -> EscrowResourceSpecifier {
+            let resource_address = self.offered_resource.resource_address();
+            if resource_address.is_fungible() {
+                EscrowResourceSpecifier::Fungible {
+                    resource_address,
+                    amount: self.offered_resource.amount()
+                }
+            } else {
+                EscrowResourceSpecifier::NonFungible {
+                    resource_address,
+                    non_fungible_local_id: self.offered_resource.as_non_fungible().non_fungible_local_id()
+                }
+            }
+        }
     }
 }
 
@@ -132,7 +147,7 @@ mod escrow {
 
 // Types //
 
-#[derive(ScryptoSbor, Clone, ManifestSbor)]
+#[derive(ScryptoSbor, Clone, ManifestSbor, Debug)]
 pub enum EscrowResourceSpecifier {
     Fungible {
         resource_address: ResourceAddress,
