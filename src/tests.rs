@@ -1,71 +1,229 @@
 use scrypto::prelude::*;
 use scrypto_test::prelude::*;
 
-use crate::{escrow::Escrow, EscrowResourceSpecifier};
+use crate::{EscrowBadge, EscrowResourceSpecifier, DEFAULT_ESCROW_ID};
 
-#[test]
-fn escrow_test() -> Result<(), RuntimeError> {
+struct TestEnvironment {
+    ledger: LedgerSimulator<NoExtension, InMemorySubstateDatabase>,
+    package_address: PackageAddress,
+    account1: ComponentAddress,
+    account2: ComponentAddress,
+    public_key1: Secp256k1PublicKey,
+    public_key2: Secp256k1PublicKey,
+    offered_resource: ResourceAddress,
+    requested_resource: ResourceAddress,
+}
+
+fn setup() -> TestEnvironment {
     // Setup the environment
     let mut ledger = LedgerSimulatorBuilder::new().build();
 
-    // Create an account
-    let (public_key, _private_key, account) = ledger.new_allocated_account();
+    // Create accounts
+    let (public_key1, _private_key1, account1) = ledger.new_allocated_account();
+    let (public_key2, _private_key2, account2) = ledger.new_allocated_account();
 
     // Publish package
     let package_address = ledger.compile_and_publish(this_package!());
 
-    // Arrange
-    let mut env = TestEnvironment::new();
+    // Create test resources
+    let offered_resource = ledger.create_fungible_resource(dec!("100"), 0, account1);
+    let requested_resource = ledger.create_fungible_resource(dec!("100"), 0, account2);
 
-    // Act
-    let offered_resource = ledger.create_fungible_resource(dec!("10"), 0, account);
+    TestEnvironment {
+        ledger,
+        package_address,
+        account1,
+        account2,
+        public_key1,
+        public_key2,
+        offered_resource,
+        requested_resource,
+    }
+}
 
-    let requested_resource: EscrowResourceSpecifier = EscrowResourceSpecifier::Fungible {
-        resource_address: XRD,
-        amount: dec!("10")
-    };
-    
-    // // Assert
-    // let amount = offered_bucket.amount(&mut env).unwrap();
-    // assert_eq!(amount, dec!("10"));
-
-    // Below approach seems not to work because of not implemented for non-wasm targets,
-    //and wasm32-unknown-unknown target was breaking build
-    // ----
-    // Test the `instantiate_escrow` function.
-    // let instanciate_result = Escrow::instantiate_escrow(
-    //     requested_resource,
-    //     offered_bucket
-    // );
-
-    // // Act
-    // // let (pool_units, _change) = radiswap.add_liquidity(bucket1, bucket2, &mut env)?;
-    // // Assert
-    // let (escrow_component, nft_bucket) = instanciate_result;
-    // assert_eq!(nft_bucket.non_fungible_local_id(), IntegerNonFungibleLocalId::new(1).value().into());
-
-    // Test the `instantiate_hello` function.
+fn instantiate_escrow(env: &mut TestEnvironment) -> (ComponentAddress, ResourceAddress) {
     let manifest = ManifestBuilder::new()
         .lock_fee_from_faucet()
-        .withdraw_from_account(account, offered_resource, dec!(10))
-        .take_all_from_worktop(offered_resource, "offered_bucket")
+        .withdraw_from_account(env.account1, env.offered_resource, dec!(10))
+        .take_all_from_worktop(env.offered_resource, "offered_bucket")
         .call_function_with_name_lookup(
-            package_address,
+            env.package_address,
             "Escrow",
             "instantiate_escrow",
-            |lookup| (  // #2
-                requested_resource,
-                lookup.bucket("offered_bucket")// #3
+            |lookup| (
+                EscrowResourceSpecifier::Fungible {
+                    resource_address: env.requested_resource,
+                    amount: dec!("10")
+                },
+                lookup.bucket("offered_bucket")
             )
         )
-        .deposit_batch(account)
+        .deposit_batch(env.account1)
         .build();
-    let receipt = ledger.execute_manifest(
+    let receipt = env.ledger.execute_manifest(
         manifest,
-        vec![NonFungibleGlobalId::from_public_key(&public_key)],
+        vec![NonFungibleGlobalId::from_public_key(&env.public_key1)],
     );
-    println!("{:?}\n", receipt);
-    let component = receipt.expect_commit(true).new_component_addresses()[0];
-    println!("Component: {:?}", component);
-    Ok(())
+    let result = receipt.expect_commit(true);
+    (result.new_component_addresses()[0], result.new_resource_addresses()[0])
+}
+
+#[test]
+fn test_instantiate_escrow() {
+    let mut env = setup();
+    let (component, escrow_nft) = instantiate_escrow(&mut env);
+
+    // Assert that the component and escrow_nft were created
+    assert!(Some(component) != None);
+    assert!(Some(escrow_nft) != None);
+    // Assert that the escrow_nft has the correct ID
+    let escrow_badge: EscrowBadge = env.ledger.get_non_fungible_data(escrow_nft, NonFungibleLocalId::integer(DEFAULT_ESCROW_ID));
+    assert_eq!(escrow_badge.offered_resource, env.offered_resource);
+}
+
+#[test]
+fn test_successful_exchange() {
+    let mut env = setup();
+    let (component, _) = instantiate_escrow(&mut env);
+
+    let manifest = ManifestBuilder::new()
+        .lock_fee_from_faucet()
+        .withdraw_from_account(env.account2, env.requested_resource, dec!(10))
+        .take_all_from_worktop(env.requested_resource, "requested_bucket")
+        .call_method_with_name_lookup(
+            component,
+            "exchange",
+            |lookup| (
+                lookup.bucket("requested_bucket"),
+            )
+        )
+        .deposit_batch(env.account2)
+        .build();
+    let receipt = env.ledger.execute_manifest(
+        manifest,
+        vec![NonFungibleGlobalId::from_public_key(&env.public_key2)],
+    );
+    receipt.expect_commit_success();
+}
+
+#[test]
+fn test_withdraw_resource() {
+    let mut env = setup();
+    let (component, escrow_nft) = instantiate_escrow(&mut env);
+
+    // First, perform the exchange
+    let exchange_manifest = ManifestBuilder::new()
+        .lock_fee_from_faucet()
+        .withdraw_from_account(env.account2, env.requested_resource, dec!(10))
+        .take_all_from_worktop(env.requested_resource, "requested_bucket")
+        .call_method_with_name_lookup(
+            component,
+            "exchange",
+            |lookup| (
+                lookup.bucket("requested_bucket"),
+            )
+        )
+        .deposit_batch(env.account2)
+        .build();
+    env.ledger.execute_manifest(
+        exchange_manifest,
+        vec![NonFungibleGlobalId::from_public_key(&env.public_key2)],
+    ).expect_commit_success();
+
+    // Then, withdraw the resource
+    let withdraw_manifest = ManifestBuilder::new()
+        .lock_fee_from_faucet()
+        .withdraw_non_fungibles_from_account(env.account1, escrow_nft, [NonFungibleLocalId::integer(DEFAULT_ESCROW_ID)])
+        .take_all_from_worktop(escrow_nft, "escrow_nft")
+        .call_method_with_name_lookup(
+            component,
+            "withdraw_resource",
+            |lookup| (
+                lookup.bucket("escrow_nft"),
+            )
+        )
+        .deposit_batch(env.account1)
+        .build();
+    let receipt = env.ledger.execute_manifest(
+        withdraw_manifest,
+        vec![NonFungibleGlobalId::from_public_key(&env.public_key1)],
+    );
+    receipt.expect_commit_success();
+}
+
+#[test]
+fn test_cancel_escrow() {
+    let mut env = setup();
+    let (component, escrow_nft) = instantiate_escrow(&mut env);
+
+    let manifest = ManifestBuilder::new()
+        .lock_fee_from_faucet()
+        .withdraw_non_fungibles_from_account(env.account1, escrow_nft, [NonFungibleLocalId::integer(DEFAULT_ESCROW_ID)])
+        .take_all_from_worktop(escrow_nft, "escrow_nft")
+        .call_method_with_name_lookup(
+            component,
+            "cancel_escrow",
+            |lookup| (
+                lookup.bucket("escrow_nft"),
+            )
+        )
+        .deposit_batch(env.account1)
+        .build();
+    let receipt = env.ledger.execute_manifest(
+        manifest,
+        vec![NonFungibleGlobalId::from_public_key(&env.public_key1)],
+    );
+    receipt.expect_commit_success();
+}
+
+#[test]
+fn test_exchange_with_incorrect_amount() {
+    let mut env = setup();
+    let (component, _) = instantiate_escrow(&mut env);
+
+    let manifest = ManifestBuilder::new()
+        .lock_fee_from_faucet()
+        .withdraw_from_account(env.account2, env.requested_resource, dec!(5))
+        .take_all_from_worktop(env.requested_resource, "requested_bucket")
+        .call_method_with_name_lookup(
+            component,
+            "exchange",
+            |lookup| (
+                lookup.bucket("requested_bucket"),
+            )
+        )
+        .deposit_batch(env.account2)
+        .build();
+    let receipt = env.ledger.execute_manifest(
+        manifest,
+        vec![NonFungibleGlobalId::from_public_key(&env.public_key2)],
+    );
+    receipt.expect_commit_failure();
+}
+
+#[test]
+fn test_withdraw_without_exchange() {
+    let mut env = setup();
+    let (component, escrow_nft) = instantiate_escrow(&mut env);
+
+    let manifest = ManifestBuilder::new()
+        .lock_fee_from_faucet()
+        .withdraw_non_fungibles_from_account(env.account1, escrow_nft, [NonFungibleLocalId::integer(DEFAULT_ESCROW_ID)])
+        .take_all_from_worktop(escrow_nft, "escrow_nft")
+        .call_method_with_name_lookup(
+            component,
+            "withdraw_resource",
+            |lookup| (
+                lookup.bucket("escrow_nft"),
+            )
+        )
+        .deposit_batch(env.account1)
+        .build();
+    let receipt = env.ledger.execute_manifest(
+        manifest,
+        vec![NonFungibleGlobalId::from_public_key(&env.public_key1)],
+    );
+    println!("Withdraw Without Exchange Receipt: {:?}\n", receipt);
+    receipt.expect_commit_failure();
+
 }

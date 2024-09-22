@@ -1,5 +1,7 @@
 use scrypto::prelude::*;
 
+const DEFAULT_ESCROW_ID: u64 = 1;
+
 #[blueprint]
 mod escrow {
     struct Escrow {
@@ -22,8 +24,16 @@ mod escrow {
                         "name" => "Cool radix hackathon escrow badge", locked;
                     }
                 ))
+                .mint_roles(mint_roles!(
+                    minter => rule!(deny_all);
+                    minter_updater => rule!(deny_all);
+                ))
+                .burn_roles(burn_roles!(
+                    burner => rule!(allow_all); // TODO - allow only the escrow contract to burn?
+                    burner_updater => rule!(deny_all);
+                ))
                 .mint_initial_supply(vec![(
-                    IntegerNonFungibleLocalId::new(1),
+                    IntegerNonFungibleLocalId::new(DEFAULT_ESCROW_ID),
                     EscrowBadge {
                         offered_resource: offered_resource.resource_address()
                     }
@@ -57,12 +67,23 @@ mod escrow {
                 self.requested_resource_vault.resource_address(),
                 "You must exchange the requested resource, invalid resource specified!"
             );
-
-            assert_eq!(
-                self.requested_resource_vault.amount(),
-                bucket_of_resource.amount(),
-                "You must exchange the requested amount!"
-            );
+            match &self.requested_resource {
+                EscrowResourceSpecifier::Fungible { amount, .. } => {
+                    assert_eq!(
+                        *amount,
+                        bucket_of_resource.amount(),
+                        "You must exchange the requested amount!"
+                    );
+                },
+                EscrowResourceSpecifier::NonFungible { non_fungible_local_id, .. } => {
+                    let bucket_id = bucket_of_resource.as_non_fungible().non_fungible_local_id();
+                    assert_eq!(
+                        *non_fungible_local_id,
+                        bucket_id,
+                        "You must exchange the requested non-fungible ID!"
+                    );
+                }
+            }
 
             self.requested_resource_vault.put(bucket_of_resource);
 
