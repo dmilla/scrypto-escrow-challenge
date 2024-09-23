@@ -5,7 +5,8 @@ edition = "2021"
 resolver = "2"
 
 [dependencies]
-scrypto = { version = "1.2.0" }
+scrypto = { git = "https://github.com/radixdlt/radixdlt-scrypto", tag = "v1.2.0" }
+radix-transactions = { git = "https://github.com/radixdlt/radixdlt-scrypto", tag = "v1.2.0" }
 
 [dev-dependencies]
 scrypto-test = { version = "1.2.0" }
@@ -29,3 +30,27 @@ crate-type = ["cdylib", "lib"]
 [workspace]
 # Set the package crate as its own empty workspace, to hide it from any potential ancestor workspace
 # Remove this [workspace] section if you intend the package to be part of a Cargo workspace
+
+# =========
+# Transaction manifests
+# =========
+
+[[bin]]
+name = "instantiate_escrow"
+path = "src/transactions/instantiate_escrow.rs"
+
+[[bin]]
+name = "instantiate_escrow_nft"
+path = "src/transactions/instantiate_escrow_nft.rs"
+
+[[bin]]
+name = "cancel_escrow"
+path = "src/transactions/cancel_escrow.rs"
+
+[[bin]]
+name = "exchange"
+path = "src/transactions/exchange.rs"
+
+[[bin]]
+name = "withdraw_resource"
+path = "src/transactions/withdraw_resource.rs"

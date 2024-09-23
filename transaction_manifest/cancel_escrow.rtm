@@ -1,0 +1,22 @@
+CALL_METHOD
+    Address("account_tdx_2_12xh47xjynaa57nf4wp9xkvcxaasdle0d9w4gglxuce789dz3tffkzx")
+    "withdraw_non_fungibles"
+    Address("resource_tdx_2_1ntae2zk8xslaz9hvz0qt4stnqm3trchj0pkqw4aatdq6mn4adgfwa5")
+    Array<NonFungibleLocalId>(
+        NonFungibleLocalId("#1#")
+    )
+;
+TAKE_ALL_FROM_WORKTOP
+    Address("resource_tdx_2_1ntae2zk8xslaz9hvz0qt4stnqm3trchj0pkqw4aatdq6mn4adgfwa5")
+    Bucket("badge")
+;
+CALL_METHOD
+    Address("component_tdx_2_1crn3hpvu29nuvg74a5zhgr87kkqvktrn39k0429c2n4fmrc90vuv24")
+    "cancel_escrow"
+    Bucket("badge")
+;
+CALL_METHOD
+    Address("account_tdx_2_12xh47xjynaa57nf4wp9xkvcxaasdle0d9w4gglxuce789dz3tffkzx")
+    "deposit_batch"
+    Expression("ENTIRE_WORKTOP")
+;
