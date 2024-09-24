@@ -1,19 +1,19 @@
 CALL_METHOD
     Address("account_tdx_2_12xh47xjynaa57nf4wp9xkvcxaasdle0d9w4gglxuce789dz3tffkzx")
     "withdraw_non_fungibles"
-    Address("resource_tdx_2_1nt693t58qracladxxz7h2q8rdvjrwsnye7w7n7hh3rl2ypn7eaczgd")
+    Address("resource_tdx_2_1ntxn2zuu59fhetlg6xcvm0zpe3naa9pcwt7mpwc6hhkm9qq9myddrs")
     Array<NonFungibleLocalId>(
-        NonFungibleLocalId("#1#")
+        NonFungibleLocalId("#0#")
     )
 ;
 TAKE_ALL_FROM_WORKTOP
-    Address("resource_tdx_2_1nt693t58qracladxxz7h2q8rdvjrwsnye7w7n7hh3rl2ypn7eaczgd")
-    Bucket("badge")
+    Address("resource_tdx_2_1ntxn2zuu59fhetlg6xcvm0zpe3naa9pcwt7mpwc6hhkm9qq9myddrs")
+    Bucket("requested_nft")
 ;
 CALL_METHOD
     Address("component_tdx_2_1cpeer9jteykrff5hng6uwv4zruud9s4f329k3uv3y5lyjds2wjkxt9")
-    "withdraw_resource"
-    Bucket("badge")
+    "exchange"
+    Bucket("requested_nft")
 ;
 CALL_METHOD
     Address("account_tdx_2_12xh47xjynaa57nf4wp9xkvcxaasdle0d9w4gglxuce789dz3tffkzx")

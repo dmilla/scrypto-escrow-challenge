@@ -1,0 +1,26 @@
+CALL_METHOD
+    Address("account_tdx_2_12xh47xjynaa57nf4wp9xkvcxaasdle0d9w4gglxuce789dz3tffkzx")
+    "withdraw"
+    Address("resource_tdx_2_1tknxxxxxxxxxradxrdxxxxxxxxx009923554798xxxxxxxxxtfd2jc")
+    Decimal("5")
+;
+TAKE_FROM_WORKTOP
+    Address("resource_tdx_2_1tknxxxxxxxxxradxrdxxxxxxxxx009923554798xxxxxxxxxtfd2jc")
+    Decimal("5")
+    Bucket("xrd")
+;
+CALL_FUNCTION
+    Address("package_tdx_2_1p5emmw82zqhx0ufhplc08u4me8g32llvxxerp9jk2fnmdl2e6ma32y")
+    "Escrow"
+    "instantiate_escrow"
+    Enum<1u8>(
+        Address("resource_tdx_2_1ntxn2zuu59fhetlg6xcvm0zpe3naa9pcwt7mpwc6hhkm9qq9myddrs"),
+        NonFungibleLocalId("#0#")
+    )
+    Bucket("xrd")
+;
+CALL_METHOD
+    Address("account_tdx_2_12xh47xjynaa57nf4wp9xkvcxaasdle0d9w4gglxuce789dz3tffkzx")
+    "deposit_batch"
+    Expression("ENTIRE_WORKTOP")
+;

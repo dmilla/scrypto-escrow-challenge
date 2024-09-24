@@ -44,12 +44,20 @@ name = "instantiate_escrow_nft"
 path = "src/transactions/instantiate_escrow_nft.rs"
 
 [[bin]]
+name = "instantiate_escrow_request_nft"
+path = "src/transactions/instantiate_escrow_request_nft.rs"
+
+[[bin]]
 name = "cancel_escrow"
 path = "src/transactions/cancel_escrow.rs"
 
 [[bin]]
 name = "exchange"
 path = "src/transactions/exchange.rs"
+
+[[bin]]
+name = "exchange_nft"
+path = "src/transactions/exchange_nft.rs"
 
 [[bin]]
 name = "withdraw_resource"
